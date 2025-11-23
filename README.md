@@ -45,7 +45,7 @@ rtimage /dev/nst0 output.tap --max-reattempts 200
 
 **Tape Image Analyzer**
 
-A native Rust CLI/TUI tool for analyzing SIMH tape images, providing detailed information about tape structure, record formats, ANSI labels, and data signatures.
+A CLI for analysing SIMH tape images, providing detailed information about tape structure, record formats, ANSI labels, and data signatures.
 
 **Features:** Detects SIMH Extended Format markers and class bits, decodes ANSI tape labels, identifies record signatures, and offers configurable output verbosity.
 
