@@ -1,6 +1,6 @@
 # ✇ rttools - ACMS Tape Tools
 
-Tools for working with magnetic tape devices and analysing SIMH tapes. Largely designed around 9-track tapes for now.
+Tools for working with magnetic tape devices and analysing SIMH tape fiules. Largely designed around 9-track tapes (for now).
 
 SIMH `.tap` specs can be found in `./docs`.
 
