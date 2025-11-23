@@ -41,7 +41,10 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Check formatting
-      run: cargo fmt --all --check
+      run: |
+        cd rtimage && cargo fmt --all --check
+        cd ../rtinfo && cargo fmt --all --check
+        cd ../rtsimh && cargo fmt --all --check
 
     - name: Install Cross
       if: matrix.use_cross
