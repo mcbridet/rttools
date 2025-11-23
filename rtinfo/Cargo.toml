@@ -1,0 +1,12 @@
+[package]
+name = "rtinfo"
+version = "1.0.0"
+edition = "2024"
+authors = ["ACMS (Australia Computer Museum Society)"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
+indexmap = "2"
+rtsimh = { path = "../rtsimh" }

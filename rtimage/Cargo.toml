@@ -1,0 +1,12 @@
+[package]
+name = "rtimage"
+version = "1.0.0"
+edition = "2024"
+authors = ["ACMS (Australia Computer Museum Society)"]
+
+[dependencies]
+anyhow = "1.0.100"
+chrono = "0.4"
+clap = { version = "4.5.53", features = ["derive"] }
+crossbeam-channel = "0.5.15"
+rtsimh = { path = "../rtsimh" }
