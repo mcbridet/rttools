@@ -260,9 +260,7 @@ impl RecordRun {
     }
 
     fn can_extend(&self, record: &AnalyzedRecord, body: &[String]) -> bool {
-        record.length == self.length
-            && record.encoding == self.encoding
-            && *body == self.body
+        record.length == self.length && record.encoding == self.encoding && *body == self.body
     }
 
     fn extend(&mut self, record: &AnalyzedRecord) {

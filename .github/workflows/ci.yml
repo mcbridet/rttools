@@ -17,17 +17,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x86_64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             use_cross: false
-          
-          # Linux i386
           - os: ubuntu-latest
             target: i686-unknown-linux-gnu
             use_cross: true
-
-          # Linux ARM64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             use_cross: true
@@ -53,13 +48,22 @@ jobs:
       if: matrix.use_cross
       run: cargo install cross --git https://github.com/cross-rs/cross
 
-    - name: Build rtimage
+    - name: Run tests rtimage
       working-directory: rtimage
       run: |
         if [ "${{ matrix.use_cross }}" = "true" ]; then
-          cross build --verbose --target ${{ matrix.target }}
+          cross test --verbose --target ${{ matrix.target }}
         else
-          cargo build --verbose --target ${{ matrix.target }}
+          cargo test --verbose --target ${{ matrix.target }}
+        fi
+
+    - name: Run tests rtinfo
+      working-directory: rtinfo
+      run: |
+        if [ "${{ matrix.use_cross }}" = "true" ]; then
+          cross test --verbose --target ${{ matrix.target }}
+        else
+          cargo test --verbose --target ${{ matrix.target }}
         fi
 
     - name: Build rtimage (release)
@@ -69,15 +73,6 @@ jobs:
           cross build --verbose --target ${{ matrix.target }} --release
         else
           cargo build --verbose --target ${{ matrix.target }} --release
-        fi
-
-    - name: Build rtinfo
-      working-directory: rtinfo
-      run: |
-        if [ "${{ matrix.use_cross }}" = "true" ]; then
-          cross build --verbose --target ${{ matrix.target }}
-        else
-          cargo build --verbose --target ${{ matrix.target }}
         fi
 
     - name: Build rtinfo (release)
@@ -99,24 +94,6 @@ jobs:
         fi
         "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
         "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
-
-    - name: Run tests rtimage
-      working-directory: rtimage
-      run: |
-        if [ "${{ matrix.use_cross }}" = "true" ]; then
-          cross test --verbose --target ${{ matrix.target }}
-        else
-          cargo test --verbose --target ${{ matrix.target }}
-        fi
-
-    - name: Run tests rtinfo
-      working-directory: rtinfo
-      run: |
-        if [ "${{ matrix.use_cross }}" = "true" ]; then
-          cross test --verbose --target ${{ matrix.target }}
-        else
-          cargo test --verbose --target ${{ matrix.target }}
-        fi
 
     - name: Collect binaries
       run: |
@@ -156,17 +133,36 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
-    - name: Build rtimage (debug)
+    - name: Install LLVM tools
+      run: rustup component add llvm-tools-preview
+
+    - name: Check formatting
+      run: |
+        cd rtimage && cargo fmt --all --check
+        cd ../rtinfo && cargo fmt --all --check
+        cd ../rtsimh && cargo fmt --all --check
+
+    - name: Run tests rtimage
       working-directory: rtimage
-      run: cargo build --verbose --target ${{ matrix.target }}
+      run: |
+        if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER="arch -x86_64" cargo test --verbose --target ${{ matrix.target }}
+        else
+          cargo test --verbose --target ${{ matrix.target }}
+        fi
+
+    - name: Run tests rtinfo
+      working-directory: rtinfo
+      run: |
+        if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER="arch -x86_64" cargo test --verbose --target ${{ matrix.target }}
+        else
+          cargo test --verbose --target ${{ matrix.target }}
+        fi
 
     - name: Build rtimage (release)
       working-directory: rtimage
       run: cargo build --verbose --target ${{ matrix.target }} --release
-
-    - name: Build rtinfo (debug)
-      working-directory: rtinfo
-      run: cargo build --verbose --target ${{ matrix.target }}
 
     - name: Build rtinfo (release)
       working-directory: rtinfo
@@ -191,25 +187,13 @@ jobs:
         "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
         "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
 
-    - name: Run tests rtimage
-      working-directory: rtimage
-      env:
-        CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: arch -x86_64
-      run: cargo test --verbose --target ${{ matrix.target }}
-
-    - name: Run tests rtinfo
-      working-directory: rtinfo
-      env:
-        CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: arch -x86_64
-      run: cargo test --verbose --target ${{ matrix.target }}
-
     - name: Collect binaries
       run: |
         mkdir -p artifacts/${{ matrix.target }}/debug artifacts/${{ matrix.target }}/release
-        install -Dm755 rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/debug/rtimage
-        install -Dm755 rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/debug/rtinfo
-        install -Dm755 rtimage/target/${{ matrix.target }}/release/rtimage artifacts/${{ matrix.target }}/release/rtimage
-        install -Dm755 rtinfo/target/${{ matrix.target }}/release/rtinfo artifacts/${{ matrix.target }}/release/rtinfo
+        cp rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/debug/rtimage
+        cp rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/debug/rtinfo
+        cp rtimage/target/${{ matrix.target }}/release/rtimage artifacts/${{ matrix.target }}/release/rtimage
+        cp rtinfo/target/${{ matrix.target }}/release/rtinfo artifacts/${{ matrix.target }}/release/rtinfo
 
     - name: Upload macOS binaries
       uses: actions/upload-artifact@v4

@@ -1,6 +1,6 @@
-# rttools - (Rust) ACMS Tape Tools
+# ✇ rttools - ACMS Tape Tools
 
-Tools for working with magnetic tape devices and analysing SIMH tapes.
+Tools for working with magnetic tape devices and analysing SIMH tapes. Largely designed around 9-track tapes for now.
 
 SIMH `.tap` specs can be found in `./docs`.
 
@@ -12,7 +12,15 @@ SIMH `.tap` specs can be found in `./docs`.
 
 A command-line tool that copies data from physical magnetic tape devices (or files) to SIMH-compatible tape image files (`.tap` format).
 
-**Features:** Multi-threaded reading, automatic tape mark detection, configurable retry logic, and timestamped output with git hash tracking.
+**Features:** Multi-threaded and double-buffered reading, automatic tape mark detection, configurable retry logic.
+
+**Permissions**:
+
+Ideally the tool isn't run as **root**. For this to happen...
+- The user that runs this tool must have access to tape devices. On Linux, you can do this (usually) by adding them to the `tape` group and logging out/in before running the tool.
+- The tool will attempt to capture tape-related **kernel messages** such as medium errors, from `journalctl` or `dmesg`. If you do not see any output, either the tape drive is working great, or you must allow the user to see kernel messages. To do so, create the file `/etc/sysctl.d/99-dmesg-restrict.conf` with the following content: `kernel.dmesg_restrict = 0`. Run `sudo sysctl --system` to immediately apply the changes.
+
+
 
 **Usage:**
 ```bash

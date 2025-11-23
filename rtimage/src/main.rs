@@ -1,8 +1,10 @@
+mod kernel_log;
 mod reader;
 mod utils;
 
+use crate::kernel_log::KernelLogWatcher;
 use crate::reader::{TapeEvent, start_reader_thread};
-use crate::utils::{make_input_name, make_output_name};
+use crate::utils::{device_token_candidates, make_input_name, make_output_name};
 use anyhow::{Context, Result, bail};
 use chrono::Local;
 use clap::Parser;
@@ -11,9 +13,16 @@ use rtsimh::{SimhTapeWriter, VERSION};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read};
 use std::path::Path;
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
+use std::time::Instant;
 
 const GIT_HASH: &str = env!("GIT_HASH");
+static RUN_START: OnceLock<Instant> = OnceLock::new();
+static SUMMARY_PRINTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Parser, Debug)]
 #[command(
@@ -45,6 +54,10 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    record_run_start();
+    install_ctrlc_handler()?;
+    let _run_summary_guard = RunSummaryGuard;
+
     // Display header before parsing args so it shows even on errors
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
     println!("========================");
@@ -54,6 +67,7 @@ fn main() -> Result<()> {
 
     let out_path = make_output_name(&args.output);
     let input_name = make_input_name(&args.input);
+    let device_tokens = device_token_candidates(&input_name);
 
     // Display output path after successful parsing
     let full_output_path = std::fs::canonicalize(&out_path)
@@ -79,6 +93,25 @@ fn main() -> Result<()> {
     println!("Destination: {}", full_output_path);
     println!("========================");
     println!();
+
+    let _kernel_log_guard = if !device_tokens.is_empty() {
+        match KernelLogWatcher::start(device_tokens.clone()) {
+            Ok(watcher) => {
+                eprintln!(
+                    "[kernel] capturing kernel log lines containing: {}",
+                    device_tokens.join(", ")
+                );
+                Some(watcher)
+            }
+            Err(err) => {
+                eprintln!("[kernel] Unable to read kernel logs, continuing anyway.");
+                eprintln!("[kernel] Details: {err}");
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     // Check if output exists
     if std::path::Path::new(&out_path).exists() && !args.ignore_existing {
@@ -174,4 +207,67 @@ fn main() -> Result<()> {
     println!("Pulled {} records ({} bytes).", count, bytes);
 
     Ok(())
+}
+
+fn record_run_start() {
+    let now = Instant::now();
+    let _ = RUN_START.set(now);
+}
+
+fn install_ctrlc_handler() -> Result<()> {
+    ctrlc::set_handler(|| {
+        print_run_summary();
+        std::process::exit(130);
+    })
+    .context("Failed to install Ctrl+C handler")
+}
+
+struct RunSummaryGuard;
+
+impl Drop for RunSummaryGuard {
+    fn drop(&mut self) {
+        print_run_summary();
+    }
+}
+
+fn print_run_summary() {
+    if SUMMARY_PRINTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let elapsed_secs = RUN_START
+        .get()
+        .map(|start| start.elapsed().as_secs())
+        .unwrap_or(0);
+
+    println!("========================");
+    println!("Timestamp: {}", Local::now().format("%Y-%m-%d %H:%M:%S"));
+    println!(
+        "Run ended after {} seconds.",
+        format_seconds_with_commas(elapsed_secs)
+    );
+}
+
+fn format_seconds_with_commas(mut seconds: u64) -> String {
+    if seconds == 0 {
+        return "0".to_string();
+    }
+
+    let mut chunks = Vec::new();
+    while seconds > 0 {
+        chunks.push(seconds % 1000);
+        seconds /= 1000;
+    }
+
+    let mut result = String::new();
+    if let Some(head) = chunks.pop() {
+        result.push_str(&head.to_string());
+    }
+
+    while let Some(chunk) = chunks.pop() {
+        result.push(',');
+        result.push_str(&format!("{chunk:03}"));
+    }
+
+    result
 }

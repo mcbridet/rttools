@@ -191,11 +191,11 @@ impl SignatureDetector {
             && data[6] == b'-'
         {
             signatures.push(
-                    RecordSignature::new("lha", "LHA/LZH archive header")
-                        .with_format("LHA/LZH archive")
-                        .with_platform("MS-DOS / Amiga")
-                        .with_confidence("medium")
-                        .with_details("Header marker '-lh?-' starts at offset 2"),
+                RecordSignature::new("lha", "LHA/LZH archive header")
+                    .with_format("LHA/LZH archive")
+                    .with_platform("MS-DOS / Amiga")
+                    .with_confidence("medium")
+                    .with_details("Header marker '-lh?-' starts at offset 2"),
             );
         }
     }
