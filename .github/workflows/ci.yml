@@ -66,6 +66,24 @@ jobs:
           cargo test --verbose --target ${{ matrix.target }}
         fi
 
+    - name: Build rtimage (debug)
+      working-directory: rtimage
+      run: |
+        if [ "${{ matrix.use_cross }}" = "true" ]; then
+          cross build --verbose --target ${{ matrix.target }}
+        else
+          cargo build --verbose --target ${{ matrix.target }}
+        fi
+
+    - name: Build rtinfo (debug)
+      working-directory: rtinfo
+      run: |
+        if [ "${{ matrix.use_cross }}" = "true" ]; then
+          cross build --verbose --target ${{ matrix.target }}
+        else
+          cargo build --verbose --target ${{ matrix.target }}
+        fi
+
     - name: Build rtimage (release)
       working-directory: rtimage
       run: |
@@ -159,6 +177,14 @@ jobs:
         else
           cargo test --verbose --target ${{ matrix.target }}
         fi
+
+    - name: Build rtimage (debug)
+      working-directory: rtimage
+      run: cargo build --verbose --target ${{ matrix.target }}
+
+    - name: Build rtinfo (debug)
+      working-directory: rtinfo
+      run: cargo build --verbose --target ${{ matrix.target }}
 
     - name: Build rtimage (release)
       working-directory: rtimage
