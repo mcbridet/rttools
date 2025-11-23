@@ -8,9 +8,9 @@ SIMH `.tap` specs can be found in `./docs`.
 
 ### 🎞️ rtimage
 
-**Magnetic Tape to SIMH Image Converter**
+**Magnetic Tape -> SIMH .TAP Image Creator**
 
-A command-line tool that copies data from physical magnetic tape devices (or files) to SIMH-compatible tape image files (`.tap` format).
+A command-line tool that copies data from physical magnetic tape SCSI devices to SIMH-compatible tape image files (`.tap` format).
 
 **Features:** Multi-threaded and double-buffered reading, automatic tape mark detection, configurable retry logic.
 
