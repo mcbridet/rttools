@@ -43,7 +43,7 @@ rtimage /dev/nst0 output.tap --max-reattempts 200
 
 ### 🔍 rtinfo
 
-**Tape Image Analyzer**
+**Tape Image Analyser**
 
 A CLI for analysing SIMH tape images, providing detailed information about tape structure, record formats, ANSI labels, and data signatures.
 
@@ -51,7 +51,7 @@ A CLI for analysing SIMH tape images, providing detailed information about tape 
 
 **Usage:**
 ```bash
-# Analyze tape image with default settings
+# Analyse tape image with default settings
 rtinfo mytape.tap
 
 # Show summaries only (minimal output)
