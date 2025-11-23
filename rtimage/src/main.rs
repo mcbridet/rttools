@@ -55,12 +55,6 @@ fn main() -> Result<()> {
     let out_path = make_output_name(&args.output);
     let input_name = make_input_name(&args.input);
 
-    println!("Timestamp: {}", timestamp);
-    println!("SCSI Device: {}", input_name);
-    println!("Destination: {}", out_path);
-    println!("========================");
-    println!();
-
     // Display output path after successful parsing
     let full_output_path = std::fs::canonicalize(&out_path)
         .unwrap_or_else(|_| {
@@ -76,6 +70,15 @@ fn main() -> Result<()> {
         })
         .display()
         .to_string();
+
+    println!("Timestamp: {}", timestamp);
+    println!(
+        "SCSI Device: {}",
+        input_name.as_deref().unwrap_or("- (stdin)")
+    );
+    println!("Destination: {}", full_output_path);
+    println!("========================");
+    println!();
 
     // Check if output exists
     if std::path::Path::new(&out_path).exists() && !args.ignore_existing {
