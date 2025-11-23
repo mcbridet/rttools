@@ -40,6 +40,9 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
+    - name: Install LLVM tools
+      run: rustup component add llvm-tools-preview
+
     - name: Check formatting
       run: |
         cd rtimage && cargo fmt --all --check
@@ -59,6 +62,15 @@ jobs:
           cargo build --verbose --target ${{ matrix.target }}
         fi
 
+    - name: Build rtimage (release)
+      working-directory: rtimage
+      run: |
+        if [ "${{ matrix.use_cross }}" = "true" ]; then
+          cross build --verbose --target ${{ matrix.target }} --release
+        else
+          cargo build --verbose --target ${{ matrix.target }} --release
+        fi
+
     - name: Build rtinfo
       working-directory: rtinfo
       run: |
@@ -67,6 +79,21 @@ jobs:
         else
           cargo build --verbose --target ${{ matrix.target }}
         fi
+
+    - name: Build rtinfo (release)
+      working-directory: rtinfo
+      run: |
+        if [ "${{ matrix.use_cross }}" = "true" ]; then
+          cross build --verbose --target ${{ matrix.target }} --release
+        else
+          cargo build --verbose --target ${{ matrix.target }} --release
+        fi
+
+    - name: Strip release binaries
+      run: |
+        STRIP=$(rustup which llvm-strip)
+        "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
+        "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
 
     - name: Run tests rtimage
       working-directory: rtimage
@@ -88,9 +115,11 @@ jobs:
 
     - name: Collect binaries
       run: |
-        mkdir -p artifacts/${{ matrix.target }}
-        install -Dm755 rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/rtimage
-        install -Dm755 rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/rtinfo
+        mkdir -p artifacts/${{ matrix.target }}/debug artifacts/${{ matrix.target }}/release
+        install -Dm755 rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/debug/rtimage
+        install -Dm755 rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/debug/rtinfo
+        install -Dm755 rtimage/target/${{ matrix.target }}/release/rtimage artifacts/${{ matrix.target }}/release/rtimage
+        install -Dm755 rtinfo/target/${{ matrix.target }}/release/rtinfo artifacts/${{ matrix.target }}/release/rtinfo
 
     - name: Upload rttools binaries
       uses: actions/upload-artifact@v4

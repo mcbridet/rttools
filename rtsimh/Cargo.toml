@@ -6,3 +6,6 @@ authors = ["ACMS (Australia Computer Museum Society)"]
 
 [lib]
 crate-type = ["rlib"]
+
+[profile.release]
+panic = "abort"
