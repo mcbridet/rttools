@@ -91,7 +91,8 @@ jobs:
 
     - name: Strip release binaries
       run: |
-        STRIP=$(rustup which llvm-strip)
+        STRIP="$(rustc --print sysroot)/lib/rustlib/bin/llvm-strip"
+        chmod +x "$STRIP"
         "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
         "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
 
