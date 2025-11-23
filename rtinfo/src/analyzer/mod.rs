@@ -6,7 +6,7 @@ pub mod signature;
 
 use indexmap::IndexSet;
 use reader::{SimhTapeBlock, SimhTapeMark, SimhTapeReader, SimhTapeRecord};
-use std::io::Cursor;
+use std::io::{self, Cursor};
 
 pub use formats::{
     AnsiLabel, TapeSummary, decode_ansi_label, extract_backup_command, summarize_file_records,
@@ -208,7 +208,7 @@ pub fn analyze_bytes(bytes: &[u8]) -> TapeAnalysis {
                 break;
             }
             Err(err) => {
-                analysis.warnings.push(err.to_string());
+                analysis.warnings.push(describe_reader_error(&err));
                 if let Some(file) = current_file.take() {
                     push_completed_file(&mut analysis, file);
                 }
@@ -326,4 +326,27 @@ fn push_completed_file(analysis: &mut TapeAnalysis, mut file: TapeFile) {
         file.summary = summarize_file_records(&file.records);
     }
     analysis.files.push(file);
+}
+
+fn describe_reader_error(err: &io::Error) -> String {
+    if indicates_position_loss(err) {
+        format!(
+            "Reader error (position lost – SIMH heuristics triggered): {}",
+            err
+        )
+    } else {
+        format!("Reader error: {}", err)
+    }
+}
+
+fn indicates_position_loss(err: &io::Error) -> bool {
+    use std::io::ErrorKind;
+
+    if matches!(err.kind(), ErrorKind::UnexpectedEof) {
+        return true;
+    }
+
+    let msg = err.to_string();
+    err.kind() == ErrorKind::InvalidData
+        && (msg.contains("trailing length") || msg.contains("truncated SIMH word"))
 }

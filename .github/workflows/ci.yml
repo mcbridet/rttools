@@ -121,12 +121,88 @@ jobs:
     - name: Collect binaries
       run: |
         mkdir -p artifacts/${{ matrix.target }}/debug artifacts/${{ matrix.target }}/release
+        cp rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/debug/rtimage
+        cp rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/debug/rtinfo
+        cp rtimage/target/${{ matrix.target }}/release/rtimage artifacts/${{ matrix.target }}/release/rtimage
+        cp rtinfo/target/${{ matrix.target }}/release/rtinfo artifacts/${{ matrix.target }}/release/rtinfo
+
+    - name: Upload rttools binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: rttools-${{ matrix.target }}
+        path: artifacts/${{ matrix.target }}
+        if-no-files-found: error
+
+  macos-build:
+    name: macOS Build ${{ matrix.target }}
+    runs-on: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Ensure Rosetta is installed
+      if: matrix.target == 'x86_64-apple-darwin'
+      run: |
+        sudo softwareupdate --install-rosetta --agree-to-license || true
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Build rtimage (debug)
+      working-directory: rtimage
+      run: cargo build --verbose --target ${{ matrix.target }}
+
+    - name: Build rtimage (release)
+      working-directory: rtimage
+      run: cargo build --verbose --target ${{ matrix.target }} --release
+
+    - name: Build rtinfo (debug)
+      working-directory: rtinfo
+      run: cargo build --verbose --target ${{ matrix.target }}
+
+    - name: Build rtinfo (release)
+      working-directory: rtinfo
+      run: cargo build --verbose --target ${{ matrix.target }} --release
+
+    - name: Strip release binaries
+      run: |
+        HOST_TRIPLE=$(rustc -Vv | awk '/host:/ { print $2 }')
+        STRIP="$(rustc --print sysroot)/lib/rustlib/${HOST_TRIPLE}/bin/llvm-strip"
+        if [ ! -x "$STRIP" ]; then
+          STRIP=$(xcrun --find llvm-strip)
+        fi
+        "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
+        "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
+
+    - name: Run tests rtimage
+      working-directory: rtimage
+      env:
+        CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: arch -x86_64
+      run: cargo test --verbose --target ${{ matrix.target }}
+
+    - name: Run tests rtinfo
+      working-directory: rtinfo
+      env:
+        CARGO_TARGET_X86_64_APPLE_DARWIN_RUNNER: arch -x86_64
+      run: cargo test --verbose --target ${{ matrix.target }}
+
+    - name: Collect binaries
+      run: |
+        mkdir -p artifacts/${{ matrix.target }}/debug artifacts/${{ matrix.target }}/release
         install -Dm755 rtimage/target/${{ matrix.target }}/debug/rtimage artifacts/${{ matrix.target }}/debug/rtimage
         install -Dm755 rtinfo/target/${{ matrix.target }}/debug/rtinfo artifacts/${{ matrix.target }}/debug/rtinfo
         install -Dm755 rtimage/target/${{ matrix.target }}/release/rtimage artifacts/${{ matrix.target }}/release/rtimage
         install -Dm755 rtinfo/target/${{ matrix.target }}/release/rtinfo artifacts/${{ matrix.target }}/release/rtinfo
 
-    - name: Upload rttools binaries
+    - name: Upload macOS binaries
       uses: actions/upload-artifact@v4
       with:
         name: rttools-${{ matrix.target }}

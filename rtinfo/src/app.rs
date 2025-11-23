@@ -139,9 +139,9 @@ impl App {
             Line::from(format!("ACMS rtinfo v{} — {}", VERSION, AUTHOR)),
             Line::from(vec![Span::raw(format!(
                 "Files: {}  Records: {}  Data bytes: {}",
-                self.analysis.totals.files,
-                self.analysis.totals.records,
-                self.analysis.totals.data_bytes
+                format_number(self.analysis.totals.files),
+                format_number(self.analysis.totals.records),
+                format_number(self.analysis.totals.data_bytes)
             ))]),
         ];
 
@@ -167,6 +167,19 @@ impl App {
                         .collect::<Vec<_>>()
                         .join(", ")
                 )));
+            }
+            if !summary.details.is_empty() {
+                lines.push(Line::from("Details:"));
+                const MAX_DETAILS: usize = 4;
+                for detail in summary.details.iter().take(MAX_DETAILS) {
+                    lines.push(Line::from(format!("  - {detail}")));
+                }
+                if summary.details.len() > MAX_DETAILS {
+                    lines.push(Line::from(format!(
+                        "  (+{} more)",
+                        summary.details.len() - MAX_DETAILS
+                    )));
+                }
             }
         }
 
@@ -256,4 +269,14 @@ fn shutdown_terminal(mut terminal: Terminal<CrosstermBackend<Stdout>>) -> Result
 
 fn bool_flag(value: bool) -> &'static str {
     if value { "on" } else { "off" }
+}
+
+fn format_number<T: ToString>(value: T) -> String {
+    let mut text = value.to_string();
+    let mut idx = text.len() as isize - 3;
+    while idx > 0 {
+        text.insert(idx as usize, ',');
+        idx -= 3;
+    }
+    text
 }

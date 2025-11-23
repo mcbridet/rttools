@@ -94,6 +94,7 @@ impl SignatureDetector {
         let mut signatures = Vec::new();
 
         self.detect_magic_prefixes(data, &mut signatures);
+        self.detect_legacy_compression(data, &mut signatures);
         self.detect_tar(data, &mut signatures);
         self.detect_cpio(data, &mut signatures);
         self.detect_pdp11_formats(data, &mut signatures);
@@ -115,6 +116,88 @@ impl SignatureDetector {
         }
 
         signatures
+    }
+
+    fn detect_legacy_compression(&self, data: &[u8], signatures: &mut Vec<RecordSignature>) {
+        if data.len() >= 2 {
+            let first = data[0];
+            let second = data[1];
+            if matches!((first, second), (0x1f, 0x9d) | (0x1f, 0xa0)) {
+                signatures.push(
+                    RecordSignature::new("compress-z", "Unix compress (.Z) file")
+                        .with_format("compress (.Z)")
+                        .with_platform("Unix/System V")
+                        .with_confidence("high"),
+                );
+            }
+
+            if first == 0x1a && (1..=8).contains(&second) {
+                signatures.push(
+                    RecordSignature::new("arc", "ARC/PKPAK archive header")
+                        .with_format("ARC archive")
+                        .with_platform("MS-DOS / CP/M")
+                        .with_confidence("medium"),
+                );
+            }
+
+            if first == 0x60 && second == 0xea {
+                signatures.push(
+                    RecordSignature::new("arj", "ARJ archive header")
+                        .with_format("ARJ archive")
+                        .with_platform("MS-DOS / OS/2")
+                        .with_confidence("high"),
+                );
+            }
+        }
+
+        if data.len() >= 4 {
+            if &data[0..4] == b"ZOO " {
+                signatures.push(
+                    RecordSignature::new("zoo", "ZOO archive header")
+                        .with_format("ZOO archive")
+                        .with_platform("MS-DOS")
+                        .with_confidence("medium"),
+                );
+            } else if &data[0..4] == b"SIT!" {
+                signatures.push(
+                    RecordSignature::new("stuffit", "StuffIt archive")
+                        .with_format("StuffIt archive")
+                        .with_platform("Classic Mac OS")
+                        .with_confidence("high"),
+                );
+            } else if &data[0..4] == b"MSCF" {
+                signatures.push(
+                    RecordSignature::new("cab", "Microsoft Cabinet (CAB) file")
+                        .with_format("Microsoft Cabinet (CAB)")
+                        .with_platform("Windows 3.x/95/NT")
+                        .with_confidence("high"),
+                );
+            } else if &data[0..4] == b"SZDD" {
+                signatures.push(
+                    RecordSignature::new("szdd", "Microsoft Compress (SZDD) file")
+                        .with_format("Microsoft Compress (.??_)")
+                        .with_platform("MS-DOS / Windows")
+                        .with_confidence("medium")
+                        .with_details("Can be expanded with the 'expand' utility"),
+                );
+            }
+        }
+
+        if data.len() >= 7
+            && data[2] == b'-'
+            && data[3] == b'l'
+            && matches!(data[4], b'h' | b'z')
+            && data[5].is_ascii_alphanumeric()
+            && data[6] == b'-'
+        {
+            signatures.push(
+                    RecordSignature::new("lha", "LHA/LZH archive header")
+                        .with_format("LHA/LZH archive")
+                        .with_platform("MS-DOS / Amiga")
+                        .with_confidence("medium")
+                        .with_details("Header marker '-lh?-' starts at offset 2"),
+            );
+        }
     }
 
     fn detect_magic_prefixes(&self, data: &[u8], signatures: &mut Vec<RecordSignature>) {
@@ -695,5 +778,71 @@ mod tests {
         let data = vec![0u8; 100];
         let signatures = detector.detect(&data, 2048);
         assert!(signatures.iter().any(|sig| sig.tag == "rsx-block"));
+    }
+
+    #[test]
+    fn detects_unix_compress_format() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 64];
+        data[0] = 0x1f;
+        data[1] = 0x9d;
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "compress-z"));
+    }
+
+    #[test]
+    fn detects_lha_archive_header() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 16];
+        data[2..7].copy_from_slice(b"-lh5-");
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "lha"));
+    }
+
+    #[test]
+    fn detects_arc_header() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 32];
+        data[0] = 0x1a;
+        data[1] = 0x05;
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "arc"));
+    }
+
+    #[test]
+    fn detects_zoo_header() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(b"ZOO ");
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "zoo"));
+    }
+
+    #[test]
+    fn detects_arj_header() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 16];
+        data[0] = 0x60;
+        data[1] = 0xea;
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "arj"));
+    }
+
+    #[test]
+    fn detects_cabinet_file() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(b"MSCF");
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "cab"));
+    }
+
+    #[test]
+    fn detects_szdd_file() {
+        let detector = SignatureDetector::default();
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(b"SZDD");
+        let signatures = detector.detect(&data, data.len() as u32);
+        assert!(signatures.iter().any(|sig| sig.tag == "szdd"));
     }
 }

@@ -9,6 +9,7 @@ use rtsimh::VERSION;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
+use std::time::Instant;
 
 const GIT_HASH: &str = env!("GIT_HASH");
 
@@ -107,22 +108,39 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Show input path after successful parsing
-    let input_path = if cli.input == "-" {
-        "stdin".to_string()
+    let (input_path, report_subject) = if cli.input == "-" {
+        ("stdin".to_string(), "stdin".to_string())
     } else {
-        std::fs::canonicalize(&cli.input)
-            .unwrap_or_else(|_| Path::new(&cli.input).to_path_buf())
-            .display()
-            .to_string()
+        let resolved_path = std::fs::canonicalize(&cli.input)
+            .unwrap_or_else(|_| Path::new(&cli.input).to_path_buf());
+        let display = resolved_path.display().to_string();
+        let filename = resolved_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| display.clone());
+        (display, filename)
     };
 
     println!("Input: {}", input_path);
     println!("========================");
-    println!();
+    println!("Performing analysis...");
 
     let data = read_input(&cli.input).context("failed to read input data")?;
 
+    let start = Instant::now();
     let analysis = analyzer::analyze_bytes(&data);
+    let elapsed_ms = start.elapsed().as_millis();
+    println!(
+        "Analysis took {}ms. Results below.",
+        format_with_commas(elapsed_ms)
+    );
+    println!("========================");
+    println!("Report for {}", report_subject);
+    println!("========================");
+    println!();
+
     let options = cli.output_options();
     let report = output::format_analysis(&analysis, &options);
 
@@ -141,4 +159,14 @@ fn read_input(path: &str) -> Result<Vec<u8>> {
     } else {
         fs::read(path).with_context(|| format!("failed to read file {path}"))
     }
+}
+
+fn format_with_commas<T: ToString>(value: T) -> String {
+    let mut text = value.to_string();
+    let mut idx = text.len() as isize - 3;
+    while idx > 0 {
+        text.insert(idx as usize, ',');
+        idx -= 3;
+    }
+    text
 }
