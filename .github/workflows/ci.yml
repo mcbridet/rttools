@@ -177,7 +177,16 @@ jobs:
         HOST_TRIPLE=$(rustc -Vv | awk '/host:/ { print $2 }')
         STRIP="$(rustc --print sysroot)/lib/rustlib/${HOST_TRIPLE}/bin/llvm-strip"
         if [ ! -x "$STRIP" ]; then
-          STRIP=$(xcrun --find llvm-strip)
+          if command -v llvm-strip >/dev/null 2>&1; then
+            STRIP=$(command -v llvm-strip)
+          elif xcrun --find strip >/dev/null 2>&1; then
+            STRIP=$(xcrun --find strip)
+          elif command -v strip >/dev/null 2>&1; then
+            STRIP=$(command -v strip)
+          else
+            echo "No strip tool available; skipping strip step" >&2
+            exit 0
+          fi
         fi
         "$STRIP" rtimage/target/${{ matrix.target }}/release/rtimage
         "$STRIP" rtinfo/target/${{ matrix.target }}/release/rtinfo
