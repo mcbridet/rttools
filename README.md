@@ -1,6 +1,6 @@
 # rttools - (Rust) ACMS Tape Tools
 
-Tools for working with magnetic tape devices and SIMH tape image formats.
+Tools for working with magnetic tape devices and analysing SIMH tapes.
 
 ## Projects
 
