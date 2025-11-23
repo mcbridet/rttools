@@ -2,12 +2,12 @@ mod reader;
 mod utils;
 
 use crate::reader::{TapeEvent, start_reader_thread};
-use rtsimh::{SimhTapeWriter, VERSION};
 use crate::utils::{make_input_name, make_output_name};
 use anyhow::{Context, Result, bail};
 use chrono::Local;
 use clap::Parser;
 use crossbeam_channel::bounded;
+use rtsimh::{SimhTapeWriter, VERSION};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read};
 use std::path::Path;
