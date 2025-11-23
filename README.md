@@ -45,7 +45,9 @@ rtimage /dev/nst0 output.tap --max-reattempts 200
 
 **Tape Image Analyser**
 
-A CLI for analysing SIMH tape images, providing detailed information about tape structure, record formats, ANSI labels, and data signatures.
+A CLI tool for analysing SIMH tape images, providing detailed information about tape structure, record formats, ANSI labels, and data signatures.
+
+This was originally a web app (still exists for now at at [https://tapeinfo.tx.au](https://tapeinfo.tx.au)), but it has since been improve and ported into a tool for programmatic use.
 
 **Features:** Detects SIMH Extended Format markers and class bits, decodes ANSI tape labels, identifies record signatures, and offers configurable output verbosity.
 
