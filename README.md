@@ -2,6 +2,8 @@
 
 Tools for working with magnetic tape devices and analysing SIMH tapes.
 
+SIMH `.tap` specs can be found in `./docs`.
+
 ## Projects
 
 ### 🎞️ rtimage
@@ -27,7 +29,7 @@ rtimage - output.tap < raw_tape_data.bin
 rtimage /dev/nst0 output.tap --max-reattempts 200
 ```
 
-**Based on:** `timage.c` by Natalie & Gwyn (gwyn@arl.army.mil)
+**rtimage** is heavily based on [`timage.c`](http://inwap.com/pdp10/usenet/timage.c) by **Natalie & Gwyn** ([gwyn@arl.army.mil](gwyn@arl.army.mil)).
 
 ---
 
