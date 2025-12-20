@@ -181,18 +181,21 @@ fn main() -> Result<()> {
             break;
         }
 
-        tape_writer.write_tape_mark()?;
-
         if file_block_count == 0 {
-            // We read 0 blocks and hit a TM - this is a double tape mark (EOT).
-            // We've already written both tape marks, so we're done.
+            // We read 0 blocks and hit a TM - this could be:
+            // 1. Part of a double tape mark (EOT)
+            // 2. Drive not ready (retry situation)
             consecutive_empty_files += 1;
+            
             if consecutive_empty_files >= 2 {
-                // Two consecutive empty files = double tape mark already written
-                // Don't write another tape mark at the end
+                // Second consecutive empty file = we've already written the double tape mark.
+                // The tape drive is just confirming EOT. Don't write another tape mark.
                 break;
             }
-            // First empty file - could be a retry situation or end of tape
+            
+            // First empty file - write the tape mark, then check if we should retry
+            tape_writer.write_tape_mark()?;
+            
             if reattempts < args.max_reattempts {
                 eprintln!(
                     "\n[Attempt {}/{}] Not receiving any data from drive, retrying...",
@@ -204,12 +207,13 @@ fn main() -> Result<()> {
                 continue;
             } else {
                 // We've exhausted retries after getting a tape mark with no data.
-                // This means we hit the end of tape (double tape mark pattern).
-                // Don't write another tape mark - we already wrote it above.
+                // This likely means end of tape. Don't write another tape mark.
                 break;
             }
         } else {
-            // We got data, reset consecutive empty file counter
+            // We got data - write the tape mark that ends this file
+            tape_writer.write_tape_mark()?;
+            // Reset counters
             consecutive_empty_files = 0;
         }
     }
