@@ -155,12 +155,15 @@ fn main() -> Result<()> {
         for event in receiver {
             match event {
                 TapeEvent::Data(data) => {
-                    bytes += data.len();
+                    let record_size = data.len();
+                    bytes += record_size;
                     tape_writer.write_record(&data)?;
                     file_block_count += 1;
                     count += 1;
+                    println!("Record {}: {} bytes", count, record_size);
                     // Reset reattempts on successful read
                     reattempts = 0;
+                    consecutive_empty_files = 0;
                 }
                 TapeEvent::TapeMark => {
                     tape_mark_seen = true;
@@ -185,17 +188,8 @@ fn main() -> Result<()> {
             // We read 0 blocks and hit a TM - this could be:
             // 1. Part of a double tape mark (EOT)
             // 2. Drive not ready (retry situation)
-            consecutive_empty_files += 1;
             
-            if consecutive_empty_files >= 2 {
-                // Second consecutive empty file = we've already written the double tape mark.
-                // The tape drive is just confirming EOT. Don't write another tape mark.
-                break;
-            }
-            
-            // First empty file - write the tape mark, then check if we should retry
-            tape_writer.write_tape_mark()?;
-            
+            // First check if we should retry (drive not ready scenario)
             if reattempts < args.max_reattempts {
                 eprintln!(
                     "\n[Attempt {}/{}] Not receiving any data from drive, retrying...",
@@ -204,15 +198,29 @@ fn main() -> Result<()> {
                 );
                 thread::sleep(std::time::Duration::from_millis(500));
                 reattempts += 1;
+                // Don't increment consecutive_empty_files or write tape mark during retries
                 continue;
-            } else {
-                // We've exhausted retries after getting a tape mark with no data.
-                // This likely means end of tape. Don't write another tape mark.
+            }
+            
+            // Exhausted retries, now treat as actual tape mark
+            consecutive_empty_files += 1;
+            
+            if consecutive_empty_files >= 2 {
+                // Second consecutive empty file = double tape mark (EOT).
+                // Don't write another tape mark, we already wrote the first one.
                 break;
             }
+            
+            // First empty file after exhausting retries - write the tape mark
+            tape_writer.write_tape_mark()?;
+            println!("[Tape Mark]");
+            
+            // Reset reattempts for next potential retry cycle
+            reattempts = 0;
         } else {
             // We got data - write the tape mark that ends this file
             tape_writer.write_tape_mark()?;
+            println!("[Tape Mark]");
             // Reset counters
             consecutive_empty_files = 0;
         }
