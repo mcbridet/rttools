@@ -13,7 +13,6 @@ use rtsimh::{SimhTapeWriter, VERSION};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read};
 use std::path::Path;
-use std::process::Command;
 use std::sync::{
     OnceLock,
     atomic::{AtomicBool, Ordering},
@@ -173,9 +172,6 @@ fn main() -> Result<()> {
                 }
                 TapeEvent::Error(e) => {
                     eprintln!("Error reading tape: {}", e);
-                    if let Some(ref device_path) = input_name {
-                        reset_tape_drive(device_path);
-                    }
                     return Err(anyhow::anyhow!(e));
                 }
             }
@@ -310,48 +306,4 @@ fn format_seconds_with_commas(mut seconds: u64) -> String {
     }
 
     result
-}
-
-/// Attempt to reset the tape drive by taking it offline and then online.
-/// This can help recover from certain error states.
-fn reset_tape_drive(device_path: &str) {
-    eprintln!("[recovery] Attempting to reset tape drive...");
-    
-    // Take the drive offline
-    eprintln!("[recovery] Running: mt -f {} offline", device_path);
-    match Command::new("mt")
-        .args(["-f", device_path, "offline"])
-        .status()
-    {
-        Ok(status) if status.success() => {
-            eprintln!("[recovery] Drive taken offline successfully");
-        }
-        Ok(status) => {
-            eprintln!("[recovery] mt offline exited with status: {}", status);
-        }
-        Err(e) => {
-            eprintln!("[recovery] Failed to run mt offline: {}", e);
-            return;
-        }
-    }
-    
-    // Brief pause between commands
-    thread::sleep(std::time::Duration::from_secs(1));
-    
-    // Bring the drive back online
-    eprintln!("[recovery] Running: mt -f {} online", device_path);
-    match Command::new("mt")
-        .args(["-f", device_path, "online"])
-        .status()
-    {
-        Ok(status) if status.success() => {
-            eprintln!("[recovery] Drive brought online successfully");
-        }
-        Ok(status) => {
-            eprintln!("[recovery] mt online exited with status: {}", status);
-        }
-        Err(e) => {
-            eprintln!("[recovery] Failed to run mt online: {}", e);
-        }
-    }
 }
