@@ -13,6 +13,7 @@ use rtsimh::{SimhTapeWriter, VERSION};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read};
 use std::path::Path;
+use std::process::Command;
 use std::sync::{
     OnceLock,
     atomic::{AtomicBool, Ordering},
@@ -132,6 +133,8 @@ fn main() -> Result<()> {
     let mut bytes = 0;
     let mut reattempts = 0;
     let mut consecutive_empty_files = 0; // Track consecutive tape marks with no data (double TM = EOT)
+    let mut tape_record_count = 0;
+    let mut prev_bytes: usize = 0;
 
     // Loop for reading tape files (separated by Tape Marks)
     loop {
@@ -160,7 +163,6 @@ fn main() -> Result<()> {
                     tape_writer.write_record(&data)?;
                     file_block_count += 1;
                     count += 1;
-                    println!("Record {}: {} bytes", count, record_size);
                     // Reset reattempts on successful read
                     reattempts = 0;
                     consecutive_empty_files = 0;
@@ -171,6 +173,9 @@ fn main() -> Result<()> {
                 }
                 TapeEvent::Error(e) => {
                     eprintln!("Error reading tape: {}", e);
+                    if let Some(ref device_path) = input_name {
+                        reset_tape_drive(device_path);
+                    }
                     return Err(anyhow::anyhow!(e));
                 }
             }
@@ -220,13 +225,26 @@ fn main() -> Result<()> {
         } else {
             // We got data - write the tape mark that ends this file
             tape_writer.write_tape_mark()?;
-            println!("[Tape Mark]");
+            tape_record_count += 1;
+            let record_bytes = bytes - prev_bytes;
+            println!("Record {}: {} blocks, {} bytes", 
+                tape_record_count, 
+                file_block_count, 
+                record_bytes);
+            prev_bytes = bytes;
             // Reset counters
             consecutive_empty_files = 0;
         }
     }
 
-    println!("Pulled {} records ({} bytes).", count, bytes);
+    println!();
+    println!("========================");
+    println!("Session Complete");
+    println!("========================");
+    println!("Total Records: {}", tape_record_count);
+    println!("Total Blocks:  {}", count);
+    println!("Total Bytes:   {}", bytes);
+    println!("========================");
 
     Ok(())
 }
@@ -292,4 +310,48 @@ fn format_seconds_with_commas(mut seconds: u64) -> String {
     }
 
     result
+}
+
+/// Attempt to reset the tape drive by taking it offline and then online.
+/// This can help recover from certain error states.
+fn reset_tape_drive(device_path: &str) {
+    eprintln!("[recovery] Attempting to reset tape drive...");
+    
+    // Take the drive offline
+    eprintln!("[recovery] Running: mt -f {} offline", device_path);
+    match Command::new("mt")
+        .args(["-f", device_path, "offline"])
+        .status()
+    {
+        Ok(status) if status.success() => {
+            eprintln!("[recovery] Drive taken offline successfully");
+        }
+        Ok(status) => {
+            eprintln!("[recovery] mt offline exited with status: {}", status);
+        }
+        Err(e) => {
+            eprintln!("[recovery] Failed to run mt offline: {}", e);
+            return;
+        }
+    }
+    
+    // Brief pause between commands
+    thread::sleep(std::time::Duration::from_secs(1));
+    
+    // Bring the drive back online
+    eprintln!("[recovery] Running: mt -f {} online", device_path);
+    match Command::new("mt")
+        .args(["-f", device_path, "online"])
+        .status()
+    {
+        Ok(status) if status.success() => {
+            eprintln!("[recovery] Drive brought online successfully");
+        }
+        Ok(status) => {
+            eprintln!("[recovery] mt online exited with status: {}", status);
+        }
+        Err(e) => {
+            eprintln!("[recovery] Failed to run mt online: {}", e);
+        }
+    }
 }
