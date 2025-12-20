@@ -131,6 +131,7 @@ fn main() -> Result<()> {
     let mut count = 0;
     let mut bytes = 0;
     let mut reattempts = 0;
+    let mut consecutive_empty_files = 0; // Track consecutive tape marks with no data (double TM = EOT)
 
     // Loop for reading tape files (separated by Tape Marks)
     loop {
@@ -183,7 +184,15 @@ fn main() -> Result<()> {
         tape_writer.write_tape_mark()?;
 
         if file_block_count == 0 {
-            // We read 0 blocks and hit a TM.
+            // We read 0 blocks and hit a TM - this is a double tape mark (EOT).
+            // We've already written both tape marks, so we're done.
+            consecutive_empty_files += 1;
+            if consecutive_empty_files >= 2 {
+                // Two consecutive empty files = double tape mark already written
+                // Don't write another tape mark at the end
+                break;
+            }
+            // First empty file - could be a retry situation or end of tape
             if reattempts < args.max_reattempts {
                 eprintln!(
                     "\n[Attempt {}/{}] Not receiving any data from drive, retrying...",
@@ -194,16 +203,17 @@ fn main() -> Result<()> {
                 reattempts += 1;
                 continue;
             } else {
-                bail!(
-                    "Max reattempts ({}) reached. Drive reported 0 bytes repeatedly.",
-                    args.max_reattempts
-                );
+                // We've exhausted retries after getting a tape mark with no data.
+                // This means we hit the end of tape (double tape mark pattern).
+                // Don't write another tape mark - we already wrote it above.
+                break;
             }
+        } else {
+            // We got data, reset consecutive empty file counter
+            consecutive_empty_files = 0;
         }
     }
 
-    // Write final Tape Mark (EOT)
-    tape_writer.write_tape_mark()?;
     println!("Pulled {} records ({} bytes).", count, bytes);
 
     Ok(())
