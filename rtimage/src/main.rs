@@ -171,6 +171,12 @@ fn main() -> Result<()> {
                     break; // End of this tape file
                 }
                 TapeEvent::Error(e) => {
+                    // EIO (os error 5) often occurs at end-of-tape after double tape mark
+                    // If we've already read data, treat I/O errors as end-of-tape
+                    if count > 0 && (e.contains("os error 5") || e.contains("Input/output error")) {
+                        eprintln!("[info] I/O error at end of tape (normal): {}", e);
+                        break;
+                    }
                     eprintln!("Error reading tape: {}", e);
                     return Err(anyhow::anyhow!(e));
                 }
